@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Stair Workout" />
+<meta name="theme-color" content="#0b1220" />
+<title>Stadium Stair Tracker</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#141d2e; --panel2:#1c2740; --line:#283450;
+    --txt:#eaf0fb; --muted:#9fb0cc; --accent:#3b82f6; --accent2:#22c55e;
+    --warn:#f59e0b; --hot:#ef4444; --run:#38bdf8;
+    --radius:16px; --tap:64px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-text-size-adjust:100%;}
+  body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+  .wrap{max-width:560px; margin:0 auto; padding:16px 16px 40px;}
+  h1{font-size:22px; margin:4px 0 2px; letter-spacing:.2px;}
+  h2{font-size:16px; margin:18px 0 8px; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; font-weight:700;}
+  .sub{color:var(--muted); font-size:13px; margin:0 0 14px;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:16px; margin-bottom:14px;}
+  .row{display:flex; gap:10px;}
+  .row>*{flex:1;}
+  button{font-family:inherit; font-size:17px; font-weight:700; color:var(--txt);
+    background:var(--panel2); border:1px solid var(--line); border-radius:14px;
+    padding:0 16px; min-height:var(--tap); cursor:pointer; transition:transform .04s ease, background .15s;}
+  button:active{transform:scale(.97);}
+  .btn-accent{background:var(--accent); border-color:var(--accent);}
+  .btn-go{background:var(--accent2); border-color:var(--accent2); color:#06210f;}
+  .btn-stop{background:var(--hot); border-color:var(--hot);}
+  .btn-ghost{background:transparent;}
+  .btn-sm{min-height:46px; font-size:14px; padding:0 12px;}
+  .hidden{display:none !important;}
+  .timer{font-variant-numeric:tabular-nums; font-weight:800; font-size:64px; text-align:center; letter-spacing:1px; margin:8px 0 4px;}
+  .timer.small{font-size:34px;}
+  .pill{display:inline-block; font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; background:var(--panel2); color:var(--muted); border:1px solid var(--line);}
+  .pill.run{background:rgba(56,189,248,.15); color:var(--run); border-color:rgba(56,189,248,.4);}
+  .pill.sprint{background:rgba(239,68,68,.15); color:#fca5a5; border-color:rgba(239,68,68,.4);}
+  .climb-name{font-size:26px; font-weight:800; margin:6px 0 2px; text-align:center;}
+  .climb-desc{color:var(--muted); font-size:14px; text-align:center; min-height:20px;}
+  .progress{display:flex; gap:5px; margin:10px 0 4px;}
+  .seg{flex:1; height:8px; border-radius:6px; background:var(--panel2);}
+  .seg.done{background:var(--accent2);}
+  .seg.cur{background:var(--accent);}
+  .splitlist{margin-top:8px;}
+  .split{display:flex; justify-content:space-between; align-items:center; padding:9px 4px; border-bottom:1px solid var(--line); font-size:15px;}
+  .split:last-child{border-bottom:none;}
+  .split .nm{color:var(--muted);}
+  .split .tm{font-variant-numeric:tabular-nums; font-weight:700;}
+  .rpe-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:6px;}
+  .rpe-grid button{min-height:50px; font-size:18px; padding:0;}
+  .rpe-grid button.sel{background:var(--warn); border-color:var(--warn); color:#241a02;}
+  input,textarea{width:100%; background:var(--panel2); border:1px solid var(--line); border-radius:12px; color:var(--txt); font-family:inherit; font-size:16px; padding:12px;}
+  textarea{min-height:74px; resize:vertical;}
+  label{display:block; font-size:13px; color:var(--muted); margin:10px 0 6px; font-weight:600;}
+  .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .stat{background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:12px;}
+  .stat .v{font-size:24px; font-weight:800; font-variant-numeric:tabular-nums;}
+  .stat .l{font-size:12px; color:var(--muted); margin-top:2px;}
+  .hist{display:flex; justify-content:space-between; align-items:center; padding:12px 4px; border-bottom:1px solid var(--line);}
+  .hist:last-child{border-bottom:none;}
+  .hist .d{font-weight:700;}
+  .hist .m{font-size:12px; color:var(--muted); margin-top:2px;}
+  .hist .r{text-align:right; font-variant-numeric:tabular-nums; font-size:13px; color:var(--muted);}
+  svg.spark{width:100%; height:70px; display:block;}
+  .legend{font-size:12px; color:var(--muted); margin-top:4px;}
+  .foot{color:var(--muted); font-size:12px; text-align:center; margin-top:20px; line-height:1.5;}
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--accent2); color:#06210f; font-weight:700; padding:12px 18px; border-radius:12px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:50;}
+  .toast.show{opacity:1;}
+  .timer.alert{color:var(--accent2); animation:pulse 1s ease infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .chip-row{display:flex; gap:6px; margin-top:10px; justify-content:center; flex-wrap:wrap;}
+  .chip{font-size:13px; font-weight:700; padding:0 12px; min-height:38px; border-radius:999px;}
+  .chip.sel{background:var(--accent); border-color:var(--accent);}
+  .pr-row{display:flex; justify-content:space-between; align-items:baseline; padding:10px 4px; border-bottom:1px solid var(--line); font-size:15px;}
+  .pr-row:last-child{border-bottom:none;}
+  .pr-row .nm{color:var(--muted);}
+  .pr-row .v{font-weight:800; font-variant-numeric:tabular-nums;}
+  .pr-row .dt{font-size:12px; color:var(--muted); font-weight:400; margin-left:8px;}
+  .celebrate{background:linear-gradient(135deg,#14301f,#1c2740); border:1px solid var(--accent2);}
+  .celebrate h3{margin:0 0 4px; font-size:19px;}
+  .celebrate ul{margin:6px 0 12px; padding-left:20px; font-size:15px; line-height:1.6;}
+  details summary{cursor:pointer; color:var(--muted); font-size:14px; font-weight:600; padding:6px 0;}
+  .ref-step{display:flex; gap:10px; padding:7px 0; font-size:14px; border-bottom:1px solid var(--line);}
+  .ref-step:last-child{border-bottom:none;}
+  .ref-step .n{color:var(--muted); width:22px; flex:0 0 22px; font-weight:700;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ HOME ============ -->
+  <section id="home">
+    <h1>Stadium Stair Tracker</h1>
+    <p class="sub">Gus &amp; Matt &mdash; conditioning log</p>
+
+    <div id="prCelebrate" class="card celebrate hidden">
+      <h3>🎉 New personal record!</h3>
+      <ul id="prCelebrateList"></ul>
+      <button class="btn-sm" id="prDismissBtn" style="width:100%">Nice. Dismiss</button>
+    </div>
+
+    <div class="card">
+      <button id="startBtn" class="btn-go" style="width:100%">▶︎  Start Workout</button>
+    </div>
+
+    <div id="statsCard" class="card hidden">
+      <h2 style="margin-top:0">Progress</h2>
+      <div class="stat-grid">
+        <div class="stat"><div class="v" id="stWorkouts">0</div><div class="l">Workouts logged</div></div>
+        <div class="stat"><div class="v" id="stSets">0</div><div class="l">Total sets done</div></div>
+        <div class="stat"><div class="v" id="stBestSprint">—</div><div class="l">Best sprint climb</div></div>
+        <div class="stat"><div class="v" id="stAvgRpe">—</div><div class="l">Avg effort (RPE)</div></div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="legend"><b>Total active time per workout</b> (lower = fitter, doing more work faster)</div>
+        <svg class="spark" id="sparkTotal" viewBox="0 0 300 70" preserveAspectRatio="none"></svg>
+      </div>
+      <div style="margin-top:10px">
+        <div class="legend"><b>Fastest sprint per workout</b> (your top-end conditioning marker)</div>
+        <svg class="spark" id="sparkSprint" viewBox="0 0 300 70" preserveAspectRatio="none"></svg>
+      </div>
+      <div style="margin-top:10px">
+        <div class="legend"><b>Sprint fade per workout</b> (first → last each-step sprint; lower = holding your speed deeper into the workout)</div>
+        <svg class="spark" id="sparkFade" viewBox="0 0 300 70" preserveAspectRatio="none"></svg>
+      </div>
+    </div>
+
+    <div id="prCard" class="card hidden">
+      <h2 style="margin-top:0">Personal records</h2>
+      <div id="prList"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn-sm btn-ghost" id="resetPrBtn">↺ Reset records</button>
+      </div>
+    </div>
+
+    <div id="histCard" class="card hidden">
+      <h2 style="margin-top:0">History</h2>
+      <div id="histList"></div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Data</h2>
+      <div class="row">
+        <button class="btn-sm" id="exportCsvBtn">⬆︎ Export CSV</button>
+        <button class="btn-sm" id="exportJsonBtn">⬆︎ Backup JSON</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn-sm btn-ghost" id="importBtn">⬇︎ Import backup</button>
+        <input type="file" id="importFile" accept=".json" class="hidden" />
+      </div>
+      <p class="legend" style="margin-top:10px">Export after each session and drop the file into your project folder (or email it to yourself). CSV is built for dashboards; JSON is a full restore-able backup.</p>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>The workout — one set (9 climbs)</summary>
+        <div id="refList" style="margin-top:8px"></div>
+        <p class="legend" style="margin-top:10px">Run-up between each drill. 1–3 min rest between sets. Target: 5 sets.</p>
+      </details>
+    </div>
+
+    <p class="foot">Runs fully offline once loaded. Add to your Home Screen for an app-like, full-screen experience. All data stays on this device until you export it.</p>
+  </section>
+
+  <!-- ============ WORKOUT ============ -->
+  <section id="workout" class="hidden">
+    <div class="row" style="align-items:center; margin-bottom:6px">
+      <div style="flex:0 0 auto"><span class="pill" id="setPill">Set 1 / 5</span></div>
+      <div style="text-align:right; flex:1"><button class="btn-sm btn-ghost" id="quitBtn" style="flex:0; min-height:40px">Quit</button></div>
+    </div>
+
+    <div class="progress" id="progress"></div>
+
+    <div class="card" style="text-align:center">
+      <span class="pill" id="climbPill">Climb 1 / 10</span>
+      <div class="climb-name" id="climbName">Run up</div>
+      <div class="climb-desc" id="climbDesc"></div>
+      <div class="timer" id="climbTimer">0.0</div>
+      <div class="row">
+        <button class="btn-go" id="climbStartStop">Start</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn-sm btn-ghost" id="skipBtn">Log without timing →</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">This set</h2>
+      <div class="splitlist" id="splitList"></div>
+    </div>
+  </section>
+
+  <!-- ============ SET DONE (RPE + rest) ============ -->
+  <section id="setdone" class="hidden">
+    <h1 id="setDoneTitle">Set complete</h1>
+    <div class="card">
+      <label>How hard was that set? (RPE 1 = easy, 10 = max)</label>
+      <div class="rpe-grid" id="rpeRow1"></div>
+      <div class="rpe-grid" id="rpeRow2" style="margin-top:8px"></div>
+    </div>
+    <div class="card" style="text-align:center">
+      <div class="legend">Rest timer — beeps &amp; flashes at your target</div>
+      <div class="timer small" id="restTimer">0:00</div>
+      <div class="chip-row" id="restChips"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn-go" id="nextSetBtn" disabled>Pick an effort to continue</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn-sm btn-ghost" id="finishEarlyBtn">Finish workout now</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FINISH ============ -->
+  <section id="finish" class="hidden">
+    <h1>Save workout</h1>
+    <div class="card">
+      <div class="stat-grid">
+        <div class="stat"><div class="v" id="fSets">0</div><div class="l">Sets completed</div></div>
+        <div class="stat"><div class="v" id="fTotal">0:00</div><div class="l">Total active time</div></div>
+        <div class="stat"><div class="v" id="fSprint">—</div><div class="l">Best sprint this session</div></div>
+        <div class="stat"><div class="v" id="fRpe">—</div><div class="l">Avg RPE</div></div>
+      </div>
+      <div class="legend" id="fFade" style="margin-top:10px"></div>
+      <label for="notesInput">Notes / conditions (heat, soreness, how you felt)</label>
+      <textarea id="notesInput" placeholder="e.g. 95°, legs heavy by set 4, felt strong on sprints"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn-go" id="saveBtn">✓ Save workout</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn-sm btn-ghost" id="discardBtn">Discard</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- Workout definition: one set = 9 climbs ---------- */
+  var CLIMBS = [
+    {key:"sprintEach1", name:"Sprint — each step",  type:"sprint", desc:"Sprint each step"},
+    {key:"shufL",       name:"Side shuffle — L",    type:"drill",  desc:"Shuffle up leading left. Walk down."},
+    {key:"shufR",       name:"Side shuffle — R",    type:"drill",  desc:"Shuffle up leading right. Walk down."},
+    {key:"sprintSkip",  name:"Sprint — skip steps", type:"sprint", desc:"Sprint skip steps"},
+    {key:"hopL",        name:"Single-leg hop — L",  type:"drill",  desc:"Hop up on left leg. Walk down."},
+    {key:"hopR",        name:"Single-leg hop — R",  type:"drill",  desc:"Hop up on right leg. Walk down."},
+    {key:"sprintEach2", name:"Sprint — each step",  type:"sprint", desc:"Sprint each step"},
+    {key:"dblhop",      name:"Double-leg hops",     type:"drill",  desc:"Both feet, hop all the way up. Walk down."},
+    {key:"sprintEach3", name:"Sprint — each step",  type:"sprint", desc:"Sprint each step"}
+  ];
+  var TARGET_SETS = 5;
+  var STORE_KEY = "stadiumStairSessions_v1";
+  var SETTINGS_KEY = "stadiumStairSettings_v1";
+  var REST_CHOICES = [60, 90, 120, 150, 180]; // seconds
+
+  /* ---------- State ---------- */
+  var sessions = load();
+  var settings = loadSettings();
+  var cur = null;           // current session being built
+  var setIdx = 0;           // 0-based set index
+  var climbIdx = 0;         // 0-based climb index within set
+  var running = false, startMs = 0, tickHandle = null, restHandle = null;
+  var restAlerted = false;  // one alert per rest period
+
+  /* ---------- Helpers ---------- */
+  function $(id){ return document.getElementById(id); }
+  function show(sec){ ["home","workout","setdone","finish"].forEach(function(s){ $(s).classList.toggle("hidden", s!==sec); }); window.scrollTo(0,0); }
+  function fmtSec(s){ return s.toFixed(1); }
+  function fmtClock(s){ s=Math.round(s); var m=Math.floor(s/60), r=s%60; return m+":"+(r<10?"0":"")+r; }
+  function pad2(n){ return (n<10?"0":"")+n; }
+  function todayISO(){ var d=new Date(); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+  function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY))||[]; }catch(e){ return []; } }
+  function loadSettings(){ try{ var s=JSON.parse(localStorage.getItem(SETTINGS_KEY))||{}; if(!s.restTarget) s.restTarget=120; return s; }catch(e){ return {restTarget:120}; } }
+  function persistSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }catch(e){} }
+  function persist(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(sessions)); }catch(e){ toast("Storage error — export a backup!"); } }
+  function toast(msg){ var t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(function(){ t.classList.remove("show"); },1800); }
+
+  /* ---------- Stats (pure, used by app + verified headless) ---------- */
+  function sessionStats(s){
+    var total=0, sprint=null, climbs=0, rpes=[];
+    s.sets.forEach(function(set){
+      set.climbs.forEach(function(c){ if(c.seconds!=null){ total+=c.seconds; climbs++; if(c.type==="sprint") sprint = (sprint==null? c.seconds : Math.min(sprint,c.seconds)); } });
+      if(set.rpe!=null) rpes.push(set.rpe);
+    });
+    var avgRpe = rpes.length? rpes.reduce(function(a,b){return a+b;},0)/rpes.length : null;
+    return { total:total, sprint:sprint, climbs:climbs, setsCompleted:s.sets.length, avgRpe:avgRpe };
+  }
+  window.__stairStats = sessionStats; // exposed for headless verification
+
+  /* ---------- Personal records (pure) ----------
+     each: fastest each-step sprint   skip: fastest skip-steps sprint
+     (legacy full-speed sprints from old 10-climb workouts are tracked
+      in session stats but excluded from the split PRs)
+     run: legacy controlled run-up PR from old data
+     fullTotal: lowest total active time among FULL (5-set) workouts only,
+                so partial sessions can't fake a "fastest workout". */
+  function sprintKind(c){
+    if(c.type!=="sprint") return null;
+    if(c.key && c.key.indexOf("sprintSkip")===0) return "skip";
+    if(c.key && c.key.indexOf("sprintEach")===0) return "each";
+    return "legacy"; // original "Full-speed sprint" climb from older workouts
+  }
+  function computePRs(list){
+    var pr = { each:null, skip:null, run:null, fullTotal:null }; // each: {v, date}
+    list.forEach(function(s){
+      var st = sessionStats(s);
+      s.sets.forEach(function(set){
+        set.climbs.forEach(function(c){
+          if(c.seconds==null) return;
+          var k = sprintKind(c);
+          if(k==="each"     && (pr.each==null || c.seconds < pr.each.v)) pr.each = {v:c.seconds, date:s.date};
+          if(k==="skip"     && (pr.skip==null || c.seconds < pr.skip.v)) pr.skip = {v:c.seconds, date:s.date};
+          if(c.type==="run" && (pr.run==null  || c.seconds < pr.run.v))  pr.run  = {v:c.seconds, date:s.date};
+        });
+      });
+      if(st.setsCompleted>=TARGET_SETS && st.total>0 && (pr.fullTotal==null || st.total < pr.fullTotal.v)) pr.fullTotal = {v:st.total, date:s.date};
+    });
+    return pr;
+  }
+  window.__stairPRs = computePRs; // exposed for headless verification
+
+  /* PR reset: records only count workouts after the reset moment.
+     Workout history itself is never touched. */
+  function prSessions(){
+    if(!settings.prResetAt) return sessions;
+    return sessions.filter(function(s){ return (s.startedAt||s.date) > settings.prResetAt; });
+  }
+  function resetPRs(){
+    if(!confirm("Reset personal records? Your workout history stays — records start fresh from your next workout.")) return;
+    settings.prResetAt = new Date().toISOString();
+    persistSettings();
+    renderHome();
+    toast("Records reset — fresh slate ✓");
+  }
+
+  /* ---------- Sprint fade (pure) ----------
+     How well speed held up over the workout: first each-step sprint
+     vs the last one, in chronological order. +% = slowed down. */
+  function sprintFade(s){
+    var arr=[];
+    s.sets.forEach(function(set){ set.climbs.forEach(function(c){ if(c.seconds!=null && sprintKind(c)==="each") arr.push(c.seconds); }); });
+    if(arr.length<2) return null;
+    var first=arr[0], last=arr[arr.length-1];
+    return { pct:(last-first)/first*100, first:first, last:last };
+  }
+  function fmtFade(f){ return (f.pct>=0?"+":"")+f.pct.toFixed(1)+"%"; }
+  window.__stairFade = sprintFade; // exposed for headless verification
+
+  /* ---------- Audio + vibration alert (offline, no files) ---------- */
+  var audioCtx = null;
+  function ensureAudio(){
+    try{
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return;
+      if(!audioCtx) audioCtx = new AC();
+      if(audioCtx.state==="suspended") audioCtx.resume();
+    }catch(e){}
+  }
+  // iOS requires a user gesture to unlock audio — every tap keeps it unlocked.
+  document.addEventListener("click", ensureAudio, true);
+  document.addEventListener("touchend", ensureAudio, true);
+  function beep(){
+    try{
+      if(!audioCtx || audioCtx.state!=="running") return;
+      var t = audioCtx.currentTime;
+      [0, 0.28, 0.56].forEach(function(off){
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type="sine"; o.frequency.value = 880;
+        g.gain.setValueAtTime(0.0001, t+off);
+        g.gain.exponentialRampToValueAtTime(0.5, t+off+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t+off+0.22);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(t+off); o.stop(t+off+0.25);
+      });
+    }catch(e){}
+  }
+  function buzz(){ try{ if(navigator.vibrate) navigator.vibrate([250,120,250,120,250]); }catch(e){} }
+
+  /* ---------- Render: reference list ---------- */
+  (function renderRef(){
+    var html="";
+    CLIMBS.forEach(function(c,i){ html += '<div class="ref-step"><span class="n">'+(i+1)+'</span><span>'+c.name+'</span></div>'; });
+    $("refList").innerHTML = html;
+  })();
+
+  /* ---------- Render: home ---------- */
+  function renderHome(){
+    if(sessions.length===0){ $("statsCard").classList.add("hidden"); $("histCard").classList.add("hidden"); $("prCard").classList.add("hidden"); return; }
+    $("statsCard").classList.remove("hidden"); $("histCard").classList.remove("hidden");
+    renderPRs();
+    var totalSets=0, bestSprint=null, allRpe=[];
+    sessions.forEach(function(s){ var st=sessionStats(s); totalSets+=st.setsCompleted; if(st.sprint!=null) bestSprint=(bestSprint==null?st.sprint:Math.min(bestSprint,st.sprint)); if(st.avgRpe!=null) allRpe.push(st.avgRpe); });
+    $("stWorkouts").textContent = sessions.length;
+    $("stSets").textContent = totalSets;
+    $("stBestSprint").textContent = bestSprint==null? "—" : fmtSec(bestSprint)+"s";
+    $("stAvgRpe").textContent = allRpe.length? (allRpe.reduce(function(a,b){return a+b;},0)/allRpe.length).toFixed(1) : "—";
+    // sparklines (chronological)
+    var chron = sessions.slice().sort(function(a,b){ return a.date<b.date?-1:1; });
+    spark($("sparkTotal"), chron.map(function(s){ return sessionStats(s).total; }), false);
+    spark($("sparkSprint"), chron.map(function(s){ return sessionStats(s).sprint; }), false);
+    spark($("sparkFade"), chron.map(function(s){ var f=sprintFade(s); return f==null?null:f.pct; }), false);
+    // history (newest first)
+    var hist = sessions.slice().sort(function(a,b){ return a.date<b.date?1:-1; });
+    var html="";
+    hist.forEach(function(s){ var st=sessionStats(s); var f=sprintFade(s);
+      html += '<div class="hist"><div><div class="d">'+s.date+'</div><div class="m">'+st.setsCompleted+' sets · '+st.climbs+' climbs'+(s.notes? ' · '+escapeHtml(s.notes.slice(0,40)) : '')+'</div></div>'
+            + '<div class="r">'+fmtClock(st.total)+' active'+(st.sprint!=null? '<br>sprint '+fmtSec(st.sprint)+'s':'')+(f!=null? '<br>fade '+fmtFade(f):'')+(st.avgRpe!=null? '<br>RPE '+st.avgRpe.toFixed(1):'')+'</div></div>';
+    });
+    $("histList").innerHTML = html;
+  }
+  function escapeHtml(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+  function renderPRs(){
+    var pr = computePRs(prSessions());
+    if(pr.each==null && pr.skip==null && pr.run==null && pr.fullTotal==null){ $("prCard").classList.add("hidden"); return; }
+    $("prCard").classList.remove("hidden");
+    var html="";
+    if(pr.each!=null)      html += prRow("🏆 Best sprint — each step",  fmtSec(pr.each.v)+"s",    pr.each.date);
+    if(pr.skip!=null)      html += prRow("⚡ Best sprint — skip steps",  fmtSec(pr.skip.v)+"s",    pr.skip.date);
+    if(pr.run!=null)       html += prRow("🏃 Best run-up (legacy)",      fmtSec(pr.run.v)+"s",     pr.run.date);
+    if(pr.fullTotal!=null) html += prRow("⏱ Fastest full workout",       fmtClock(pr.fullTotal.v), pr.fullTotal.date);
+    $("prList").innerHTML = html;
+  }
+  function prRow(name, val, date){
+    return '<div class="pr-row"><span class="nm">'+name+'</span><span class="v">'+val+'<span class="dt">'+date+'</span></span></div>';
+  }
+
+  function spark(svg, vals, _){
+    var pts = vals.filter(function(v){ return v!=null; });
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    var W=300,H=70,pad=6;
+    if(pts.length===0){ return; }
+    if(pts.length===1){ circle(svg, W/2, H/2); return; }
+    var min=Math.min.apply(null,pts), max=Math.max.apply(null,pts), span=(max-min)||1;
+    var step=(W-pad*2)/(pts.length-1);
+    var d=""; var coords=[];
+    pts.forEach(function(v,i){ var x=pad+step*i; var y=H-pad-((v-min)/span)*(H-pad*2); coords.push([x,y]); d+=(i?" L":"M")+x.toFixed(1)+" "+y.toFixed(1); });
+    var path=document.createElementNS("http://www.w3.org/2000/svg","path");
+    path.setAttribute("d",d); path.setAttribute("fill","none"); path.setAttribute("stroke","#3b82f6"); path.setAttribute("stroke-width","2.5"); path.setAttribute("stroke-linejoin","round"); path.setAttribute("stroke-linecap","round");
+    svg.appendChild(path);
+    coords.forEach(function(c,i){ circle(svg,c[0],c[1], i===coords.length-1?"#22c55e":"#3b82f6"); });
+  }
+  function circle(svg,x,y,col){ var c=document.createElementNS("http://www.w3.org/2000/svg","circle"); c.setAttribute("cx",x); c.setAttribute("cy",y); c.setAttribute("r",3); c.setAttribute("fill",col||"#3b82f6"); svg.appendChild(c); }
+
+  /* ---------- Workout flow ---------- */
+  function startWorkout(){
+    cur = { id:"s"+Date.now(), date:todayISO(), startedAt:new Date().toISOString(), sets:[], notes:"" };
+    setIdx=0; beginSet();
+  }
+  function beginSet(){
+    cur.sets[setIdx] = { setNumber:setIdx+1, climbs:[], rpe:null };
+    climbIdx=0; running=false;
+    renderClimb(); renderProgress(); renderSplits();
+    show("workout");
+  }
+  function renderClimb(){
+    var c=CLIMBS[climbIdx];
+    $("setPill").textContent = "Set "+(setIdx+1)+" / "+TARGET_SETS;
+    $("climbPill").textContent = "Climb "+(climbIdx+1)+" / "+CLIMBS.length;
+    $("climbPill").className = "pill "+(c.type==="run"?"run":c.type==="sprint"?"sprint":"");
+    $("climbName").textContent = c.name;
+    $("climbDesc").textContent = c.desc;
+    $("climbTimer").textContent = "0.0";
+    $("climbStartStop").textContent = "Start"; $("climbStartStop").className="btn-go";
+    running=false;
+  }
+  function renderProgress(){
+    var html="";
+    for(var i=0;i<CLIMBS.length;i++){ var cls="seg"; if(i<climbIdx) cls+=" done"; else if(i===climbIdx) cls+=" cur"; html+='<div class="'+cls+'"></div>'; }
+    $("progress").innerHTML=html;
+  }
+  function renderSplits(){
+    var set=cur.sets[setIdx]; var html="";
+    set.climbs.forEach(function(c){ html+='<div class="split"><span class="nm">'+c.name+'</span><span class="tm">'+(c.seconds!=null?fmtSec(c.seconds)+'s':'—')+'</span></div>'; });
+    if(set.climbs.length===0) html='<div class="split"><span class="nm">No climbs logged yet</span><span class="tm"></span></div>';
+    $("splitList").innerHTML=html;
+  }
+  function startStop(){
+    if(!running){ running=true; startMs=Date.now(); $("climbStartStop").textContent="Stop"; $("climbStartStop").className="btn-stop";
+      tickHandle=setInterval(function(){ $("climbTimer").textContent=fmtSec((Date.now()-startMs)/1000); },100);
+    } else { stopClimb((Date.now()-startMs)/1000); }
+  }
+  function stopClimb(secs){
+    running=false; clearInterval(tickHandle);
+    var c=CLIMBS[climbIdx];
+    var rounded = secs==null?null:Math.round(secs*10)/10;
+    cur.sets[setIdx].climbs.push({ key:c.key, name:c.name, type:c.type, seconds: rounded });
+    // Live PR callout the moment a sprint beats your all-time best (per style)
+    var kind = sprintKind(c);
+    if((kind==="each"||kind==="skip") && rounded!=null){
+      var pr=computePRs(prSessions());
+      var prev = kind==="each"? pr.each : pr.skip;
+      if(prev!=null && rounded < prev.v) toast("🎉 New best "+(kind==="each"?"each-step":"skip-steps")+" sprint — "+fmtSec(rounded)+"s!");
+    }
+    advance();
+  }
+  function advance(){
+    renderSplits();
+    if(climbIdx < CLIMBS.length-1){ climbIdx++; renderClimb(); renderProgress(); }
+    else { finishSet(); }
+  }
+  function finishSet(){
+    clearInterval(tickHandle);
+    $("setDoneTitle").textContent = "Set "+(setIdx+1)+" complete";
+    // RPE buttons
+    buildRpe();
+    $("nextSetBtn").disabled=true; $("nextSetBtn").textContent="Pick an effort to continue";
+    $("nextSetBtn").className="btn-go";
+    // rest timer with target alert
+    restAlerted=false;
+    var rt=$("restTimer"); rt.textContent="0:00"; rt.classList.remove("alert");
+    renderRestChips();
+    var rs=Date.now();
+    clearInterval(restHandle);
+    restHandle=setInterval(function(){
+      var el=(Date.now()-rs)/1000;
+      rt.textContent=fmtClock(el);
+      if(!restAlerted && el>=settings.restTarget){
+        restAlerted=true; rt.classList.add("alert"); beep(); buzz();
+      }
+    },500);
+    show("setdone");
+  }
+  function renderRestChips(){
+    var box=$("restChips"); box.innerHTML="";
+    REST_CHOICES.forEach(function(sec){
+      var b=document.createElement("button");
+      b.className="chip"+(settings.restTarget===sec?" sel":"");
+      b.textContent=fmtClock(sec);
+      b.onclick=function(){ settings.restTarget=sec; persistSettings(); renderRestChips(); };
+      box.appendChild(b);
+    });
+  }
+  function buildRpe(){
+    var r1=$("rpeRow1"), r2=$("rpeRow2"); r1.innerHTML=""; r2.innerHTML="";
+    for(var i=1;i<=10;i++){ (function(n){ var b=document.createElement("button"); b.textContent=n;
+      b.onclick=function(){ cur.sets[setIdx].rpe=n; Array.prototype.forEach.call(document.querySelectorAll('#rpeRow1 button,#rpeRow2 button'),function(x){x.classList.remove('sel');}); b.classList.add('sel'); $("nextSetBtn").disabled=false; $("nextSetBtn").textContent = (setIdx+1>=TARGET_SETS? "Finish workout →":"Start set "+(setIdx+2)+" →"); };
+      (n<=5?r1:r2).appendChild(b); })(i); }
+  }
+  function nextSet(){
+    clearInterval(restHandle);
+    if(setIdx+1>=TARGET_SETS){ goFinish(); }
+    else { setIdx++; beginSet(); }
+  }
+  function finishEarly(){ clearInterval(restHandle); goFinish(); }
+
+  function goFinish(){
+    var st=sessionStats(cur);
+    $("fSets").textContent=st.setsCompleted;
+    $("fTotal").textContent=fmtClock(st.total);
+    $("fSprint").textContent=st.sprint==null?"—":fmtSec(st.sprint)+"s";
+    $("fRpe").textContent=st.avgRpe==null?"—":st.avgRpe.toFixed(1);
+    var f=sprintFade(cur);
+    $("fFade").textContent = f==null? "" : "Sprint fade: "+fmtFade(f)+" — first each-step sprint "+fmtSec(f.first)+"s → last "+fmtSec(f.last)+"s"+(f.pct<=3? " (held your speed 💪)":"");
+    $("notesInput").value="";
+    show("finish");
+  }
+  function saveWorkout(){
+    cur.notes=$("notesInput").value.trim();
+    cur.endedAt=new Date().toISOString();
+    var before=computePRs(prSessions());      // records BEFORE this session (respects PR reset)
+    sessions.push(cur); persist();
+    var after=computePRs(prSessions());       // records including it
+    var beaten=[];
+    if(after.each      && (!before.each      || after.each.v      < before.each.v))      beaten.push("Best each-step sprint — <b>"+fmtSec(after.each.v)+"s</b>"+(before.each? " (was "+fmtSec(before.each.v)+"s)":""));
+    if(after.skip      && (!before.skip      || after.skip.v      < before.skip.v))      beaten.push("Best skip-steps sprint — <b>"+fmtSec(after.skip.v)+"s</b>"+(before.skip? " (was "+fmtSec(before.skip.v)+"s)":""));
+    if(after.fullTotal && (!before.fullTotal || after.fullTotal.v < before.fullTotal.v)) beaten.push("Fastest full workout — <b>"+fmtClock(after.fullTotal.v)+"</b>"+(before.fullTotal? " (was "+fmtClock(before.fullTotal.v)+")":""));
+    cur=null;
+    renderHome(); show("home");
+    var hadBaseline = !!(before.each || before.skip || before.fullTotal); // no fanfare on first workout or first after a reset
+    if(beaten.length && hadBaseline){
+      $("prCelebrateList").innerHTML = beaten.map(function(x){ return "<li>"+x+"</li>"; }).join("");
+      $("prCelebrate").classList.remove("hidden");
+      beep(); buzz();
+    } else {
+      toast("Workout saved ✓");
+    }
+  }
+  function quitWorkout(){
+    if(confirm("Quit this workout? Logged climbs in the current run will be discarded.")){ clearInterval(tickHandle); clearInterval(restHandle); cur=null; renderHome(); show("home"); }
+  }
+
+  /* ---------- Export ---------- */
+  function buildCSV(){
+    var rows=[["session_id","date","set_number","climb_index","climb_key","climb_name","climb_type","seconds","set_rpe","sets_completed_in_session","session_notes"]];
+    sessions.forEach(function(s){ var st=sessionStats(s);
+      s.sets.forEach(function(set){
+        set.climbs.forEach(function(c,ci){
+          rows.push([s.id,s.date,set.setNumber,ci+1,c.key,c.name,c.type,(c.seconds==null?"":c.seconds),(set.rpe==null?"":set.rpe),st.setsCompleted,csvSafe(s.notes||"")]);
+        });
+      });
+    });
+    return rows.map(function(r){ return r.map(csvCell).join(","); }).join("\r\n");
+  }
+  function csvSafe(s){ return String(s).replace(/[\r\n]+/g," "); }
+  function csvCell(v){ v=String(v); return /[",]/.test(v)? '"'+v.replace(/"/g,'""')+'"' : v; }
+
+  function download(filename, text, mime){
+    var blob=new Blob([text],{type:mime||"text/plain"});
+    // Prefer native share sheet on iOS so user can Save to Files / Mail / AirDrop
+    try{
+      if(navigator.canShare){ var file=new File([blob],filename,{type:mime||"text/plain"});
+        if(navigator.canShare({files:[file]})){ navigator.share({files:[file],title:filename}).catch(function(){ legacyDownload(filename,blob); }); return; }
+      }
+    }catch(e){}
+    legacyDownload(filename,blob);
+  }
+  function legacyDownload(filename,blob){
+    var url=URL.createObjectURL(blob); var a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); },500);
+  }
+  function exportCsv(){ if(sessions.length===0){ toast("No workouts to export yet"); return; } download("stadium_stairs_"+todayISO()+".csv", buildCSV(), "text/csv"); }
+  function exportJson(){ if(sessions.length===0){ toast("Nothing to back up yet"); return; } download("stadium_stairs_backup_"+todayISO()+".json", JSON.stringify(sessions,null,2), "application/json"); }
+  function importJson(file){
+    var reader=new FileReader();
+    reader.onload=function(){ try{ var data=JSON.parse(reader.result); if(!Array.isArray(data)) throw 0;
+        var ids={}; sessions.forEach(function(s){ ids[s.id]=1; }); var added=0;
+        data.forEach(function(s){ if(s&&s.id&&!ids[s.id]){ sessions.push(s); ids[s.id]=1; added++; } });
+        persist(); renderHome(); toast("Imported "+added+" workout"+(added===1?"":"s"));
+      }catch(e){ toast("Couldn't read that file"); } };
+    reader.readAsText(file);
+  }
+
+  /* ---------- Wire up ---------- */
+  $("startBtn").onclick=startWorkout;
+  $("prDismissBtn").onclick=function(){ $("prCelebrate").classList.add("hidden"); };
+  $("resetPrBtn").onclick=resetPRs;
+  $("climbStartStop").onclick=startStop;
+  $("skipBtn").onclick=function(){ if(running){ clearInterval(tickHandle); } stopClimb(null); };
+  $("quitBtn").onclick=quitWorkout;
+  $("nextSetBtn").onclick=nextSet;
+  $("finishEarlyBtn").onclick=finishEarly;
+  $("saveBtn").onclick=saveWorkout;
+  $("discardBtn").onclick=function(){ if(confirm("Discard this workout without saving?")){ cur=null; renderHome(); show("home"); } };
+  $("exportCsvBtn").onclick=exportCsv;
+  $("exportJsonBtn").onclick=exportJson;
+  $("importBtn").onclick=function(){ $("importFile").click(); };
+  $("importFile").onchange=function(e){ if(e.target.files[0]) importJson(e.target.files[0]); e.target.value=""; };
+
+  // Keep screen logic sane if user backgrounds mid-climb: stop ticking display only.
+  document.addEventListener("visibilitychange",function(){ if(document.hidden && running){ /* timer keeps real elapsed via startMs */ } });
+
+  renderHome(); show("home");
+})();
+</script>
+</body>
+</html>
