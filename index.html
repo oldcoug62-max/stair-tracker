@@ -108,7 +108,11 @@
     </div>
 
     <div class="card">
-      <button id="startBtn" class="btn-go" style="width:100%">▶︎  Start Workout</button>
+      <div class="row">
+        <button id="startGusBtn" class="btn-go">▶︎  Gus</button>
+        <button id="startMattBtn" class="btn-go">▶︎  Matt</button>
+      </div>
+      <p class="legend" style="margin-top:10px; text-align:center">Tap your name to start — your name is logged with the workout and on every export.</p>
     </div>
 
     <div id="statsCard" class="card hidden">
@@ -416,7 +420,7 @@
     var hist = sessions.slice().sort(function(a,b){ return a.date<b.date?1:-1; });
     var html="";
     hist.forEach(function(s){ var st=sessionStats(s); var f=sprintFade(s);
-      html += '<div class="hist"><div><div class="d">'+s.date+'</div><div class="m">'+st.setsCompleted+' sets · '+st.climbs+' climbs'+(s.notes? ' · '+escapeHtml(s.notes.slice(0,40)) : '')+'</div></div>'
+      html += '<div class="hist"><div><div class="d">'+s.date+(s.who? ' · '+escapeHtml(s.who):'')+'</div><div class="m">'+st.setsCompleted+' sets · '+st.climbs+' climbs'+(s.notes? ' · '+escapeHtml(s.notes.slice(0,40)) : '')+'</div></div>'
             + '<div class="r">'+fmtClock(st.total)+' active'+(st.sprint!=null? '<br>sprint '+fmtSec(st.sprint)+'s':'')+(f!=null? '<br>fade '+fmtFade(f):'')+(st.avgRpe!=null? '<br>RPE '+st.avgRpe.toFixed(1):'')+'</div></div>';
     });
     $("histList").innerHTML = html;
@@ -456,8 +460,9 @@
   function circle(svg,x,y,col){ var c=document.createElementNS("http://www.w3.org/2000/svg","circle"); c.setAttribute("cx",x); c.setAttribute("cy",y); c.setAttribute("r",3); c.setAttribute("fill",col||"#3b82f6"); svg.appendChild(c); }
 
   /* ---------- Workout flow ---------- */
-  function startWorkout(){
-    cur = { id:"s"+Date.now(), date:todayISO(), startedAt:new Date().toISOString(), sets:[], notes:"" };
+  function startWorkout(who){
+    cur = { id:"s"+Date.now(), date:todayISO(), who:who, startedAt:new Date().toISOString(), sets:[], notes:"" };
+    settings.lastWho = who; persistSettings();
     setIdx=0; beginSet();
   }
   function beginSet(){
@@ -468,7 +473,7 @@
   }
   function renderClimb(){
     var c=CLIMBS[climbIdx];
-    $("setPill").textContent = "Set "+(setIdx+1)+" / "+TARGET_SETS;
+    $("setPill").textContent = (cur && cur.who? cur.who+" · " : "")+"Set "+(setIdx+1)+" / "+TARGET_SETS;
     $("climbPill").textContent = "Climb "+(climbIdx+1)+" / "+CLIMBS.length;
     $("climbPill").className = "pill "+(c.type==="run"?"run":c.type==="sprint"?"sprint":"");
     $("climbName").textContent = c.name;
@@ -595,11 +600,11 @@
 
   /* ---------- Export ---------- */
   function buildCSV(){
-    var rows=[["session_id","date","set_number","climb_index","climb_key","climb_name","climb_type","seconds","set_rpe","sets_completed_in_session","session_notes"]];
+    var rows=[["session_id","date","who","set_number","climb_index","climb_key","climb_name","climb_type","seconds","set_rpe","sets_completed_in_session","session_notes"]];
     sessions.forEach(function(s){ var st=sessionStats(s);
       s.sets.forEach(function(set){
         set.climbs.forEach(function(c,ci){
-          rows.push([s.id,s.date,set.setNumber,ci+1,c.key,c.name,c.type,(c.seconds==null?"":c.seconds),(set.rpe==null?"":set.rpe),st.setsCompleted,csvSafe(s.notes||"")]);
+          rows.push([s.id,s.date,(s.who||""),set.setNumber,ci+1,c.key,c.name,c.type,(c.seconds==null?"":c.seconds),(set.rpe==null?"":set.rpe),st.setsCompleted,csvSafe(s.notes||"")]);
         });
       });
     });
@@ -622,8 +627,18 @@
     var url=URL.createObjectURL(blob); var a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click();
     setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); },500);
   }
-  function exportCsv(){ if(sessions.length===0){ toast("No workouts to export yet"); return; } download("stadium_stairs_"+todayISO()+".csv", buildCSV(), "text/csv"); }
-  function exportJson(){ if(sessions.length===0){ toast("Nothing to back up yet"); return; } download("stadium_stairs_backup_"+todayISO()+".json", JSON.stringify(sessions,null,2), "application/json"); }
+  /* Export filename: "Name DD.MM.YYYY HHMM" (24h). Name = whoever logged the
+     most recent workout (falls back to last name tapped, then "Workout"). */
+  function exportWho(){
+    for(var i=sessions.length-1;i>=0;i--){ if(sessions[i].who) return sessions[i].who; }
+    return settings.lastWho || "Workout";
+  }
+  function exportName(ext){
+    var d=new Date();
+    return exportWho()+" "+pad2(d.getDate())+"."+pad2(d.getMonth()+1)+"."+d.getFullYear()+" "+pad2(d.getHours())+pad2(d.getMinutes())+ext;
+  }
+  function exportCsv(){ if(sessions.length===0){ toast("No workouts to export yet"); return; } download(exportName(".csv"), buildCSV(), "text/csv"); }
+  function exportJson(){ if(sessions.length===0){ toast("Nothing to back up yet"); return; } download(exportName(".json"), JSON.stringify(sessions,null,2), "application/json"); }
   function importJson(file){
     var reader=new FileReader();
     reader.onload=function(){ try{ var data=JSON.parse(reader.result); if(!Array.isArray(data)) throw 0;
@@ -635,7 +650,8 @@
   }
 
   /* ---------- Wire up ---------- */
-  $("startBtn").onclick=startWorkout;
+  $("startGusBtn").onclick=function(){ startWorkout("Gus"); };
+  $("startMattBtn").onclick=function(){ startWorkout("Matt"); };
   $("prDismissBtn").onclick=function(){ $("prCelebrate").classList.add("hidden"); };
   $("resetPrBtn").onclick=resetPRs;
   $("climbStartStop").onclick=startStop;
