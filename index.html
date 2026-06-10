@@ -92,6 +92,8 @@
   .ref-step{display:flex; gap:10px; padding:7px 0; font-size:14px; border-bottom:1px solid var(--line);}
   .ref-step:last-child{border-bottom:none;}
   .ref-step .n{color:var(--muted); width:22px; flex:0 0 22px; font-weight:700;}
+  .ref-name{font-size:13px; font-weight:700; color:var(--txt); margin:12px 0 2px;}
+  .ref-name:first-child{margin-top:4px;}
 </style>
 </head>
 <body>
@@ -115,7 +117,7 @@
         <button id="startGusBtn" class="btn-go">▶︎  Gus</button>
         <button id="startMattBtn" class="btn-go">▶︎  Matt</button>
       </div>
-      <p class="legend" style="margin-top:10px; text-align:center">Pick your sets, then tap your name to start — your name is logged with the workout and on every export.</p>
+      <p class="legend" style="margin-top:10px; text-align:center">Pick your sets, then tap your name — each name runs its own workout and labels the export.</p>
     </div>
 
     <div id="statsCard" class="card hidden">
@@ -168,9 +170,9 @@
 
     <div class="card">
       <details>
-        <summary>The workout — one set (9 climbs)</summary>
+        <summary>The workouts — Gus (9 climbs) · Matt (8 climbs)</summary>
         <div id="refList" style="margin-top:8px"></div>
-        <p class="legend" style="margin-top:10px">Run-up between each drill. 1–3 min rest between sets. Target: 5 sets.</p>
+        <p class="legend" style="margin-top:10px">Run-up between each drill. 1–3 min rest between sets.</p>
       </details>
     </div>
 
@@ -259,18 +261,32 @@
 (function(){
   "use strict";
 
-  /* ---------- Workout definition: one set = 9 climbs ---------- */
-  var CLIMBS = [
-    {key:"sprintEach1", name:"Sprint — each step",  type:"sprint", desc:"Sprint each step"},
-    {key:"shufL",       name:"Side shuffle — L",    type:"drill",  desc:"Shuffle up leading left. Walk down."},
-    {key:"shufR",       name:"Side shuffle — R",    type:"drill",  desc:"Shuffle up leading right. Walk down."},
-    {key:"sprintSkip",  name:"Sprint — skip steps", type:"sprint", desc:"Sprint skip steps"},
-    {key:"hopL",        name:"Single-leg hop — L",  type:"drill",  desc:"Hop up on left leg. Walk down."},
-    {key:"hopR",        name:"Single-leg hop — R",  type:"drill",  desc:"Hop up on right leg. Walk down."},
-    {key:"sprintEach2", name:"Sprint — each step",  type:"sprint", desc:"Sprint each step"},
-    {key:"dblhop",      name:"Double-leg hops",     type:"drill",  desc:"Both feet, hop all the way up. Walk down."},
-    {key:"sprintEach3", name:"Sprint — each step",  type:"sprint", desc:"Sprint each step"}
-  ];
+  /* ---------- Workout definitions: one list per athlete ----------
+     Keys matter for tracking: anything starting "sprintEach" feeds the
+     each-step sprint PR + fade metric; "sprintSkip" feeds the skip-steps PR. */
+  var WORKOUTS = {
+    Gus: [
+      {key:"sprintEach1", name:"Sprint — each step",  type:"sprint", desc:"Sprint each step"},
+      {key:"shufL",       name:"Side shuffle — L",    type:"drill",  desc:"Shuffle up leading left. Walk down."},
+      {key:"shufR",       name:"Side shuffle — R",    type:"drill",  desc:"Shuffle up leading right. Walk down."},
+      {key:"sprintSkip",  name:"Sprint — skip steps", type:"sprint", desc:"Sprint skip steps"},
+      {key:"hopL",        name:"Single-leg hop — L",  type:"drill",  desc:"Hop up on left leg. Walk down."},
+      {key:"hopR",        name:"Single-leg hop — R",  type:"drill",  desc:"Hop up on right leg. Walk down."},
+      {key:"sprintEach2", name:"Sprint — each step",  type:"sprint", desc:"Sprint each step"},
+      {key:"dblhop",      name:"Double-leg hops",     type:"drill",  desc:"Both feet, hop all the way up. Walk down."},
+      {key:"sprintEach3", name:"Sprint — each step",  type:"sprint", desc:"Sprint each step"}
+    ],
+    Matt: [
+      {key:"sprintEach1", name:"Sprint — each step",  type:"sprint", desc:"Sprint each step"},
+      {key:"shufL",       name:"Side shuffle — L",    type:"drill",  desc:"Shuffle up leading left. Walk down."},
+      {key:"shufR",       name:"Side shuffle — R",    type:"drill",  desc:"Shuffle up leading right. Walk down."},
+      {key:"sprintSkip1", name:"Sprint — skip steps", type:"sprint", desc:"Sprint skip steps"},
+      {key:"dblhop1",     name:"Double-leg hops",     type:"drill",  desc:"Both feet, hop all the way up. Walk down."},
+      {key:"sprintEach2", name:"Sprint — each step",  type:"sprint", desc:"Sprint each step"},
+      {key:"dblhop2",     name:"Double-leg hops",     type:"drill",  desc:"Both feet, hop all the way up. Walk down."},
+      {key:"sprintSkip2", name:"Sprint — skip steps", type:"sprint", desc:"Sprint skip steps"}
+    ]
+  };
   var FULL_SETS = 5;                 // a "full" workout for PR purposes is always 5+ sets
   var SETS_CHOICES = [1,2,3,4,5,6];  // selectable sets per workout
   var STORE_KEY = "stadiumStairSessions_v1";
@@ -299,6 +315,7 @@
   function persist(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(sessions)); }catch(e){ toast("Storage error — export a backup!"); } }
   function toast(msg){ var t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(function(){ t.classList.remove("show"); },1800); }
   function curTarget(){ return (cur && cur.targetSets) || settings.targetSets || 5; }
+  function wk(){ return (cur && WORKOUTS[cur.who]) || WORKOUTS.Gus; } // active athlete's climb list
 
   /* ---------- Stats (pure, used by app + verified headless) ---------- */
   function sessionStats(s){
@@ -401,10 +418,13 @@
   }
   function buzz(){ try{ if(navigator.vibrate) navigator.vibrate([250,120,250,120,250]); }catch(e){} }
 
-  /* ---------- Render: reference list ---------- */
+  /* ---------- Render: reference lists (both athletes) ---------- */
   (function renderRef(){
     var html="";
-    CLIMBS.forEach(function(c,i){ html += '<div class="ref-step"><span class="n">'+(i+1)+'</span><span>'+c.name+'</span></div>'; });
+    ["Gus","Matt"].forEach(function(name){
+      html += '<div class="ref-name">'+name+' — '+WORKOUTS[name].length+' climbs</div>';
+      WORKOUTS[name].forEach(function(c,i){ html += '<div class="ref-step"><span class="n">'+(i+1)+'</span><span>'+c.name+'</span></div>'; });
+    });
     $("refList").innerHTML = html;
   })();
 
@@ -493,9 +513,9 @@
     show("workout");
   }
   function renderClimb(){
-    var c=CLIMBS[climbIdx];
+    var c=wk()[climbIdx];
     $("setPill").textContent = (cur && cur.who? cur.who+" · " : "")+"Set "+(setIdx+1)+" / "+curTarget();
-    $("climbPill").textContent = "Climb "+(climbIdx+1)+" / "+CLIMBS.length;
+    $("climbPill").textContent = "Climb "+(climbIdx+1)+" / "+wk().length;
     $("climbPill").className = "pill "+(c.type==="run"?"run":c.type==="sprint"?"sprint":"");
     $("climbName").textContent = c.name;
     $("climbDesc").textContent = c.desc;
@@ -505,7 +525,7 @@
   }
   function renderProgress(){
     var html="";
-    for(var i=0;i<CLIMBS.length;i++){ var cls="seg"; if(i<climbIdx) cls+=" done"; else if(i===climbIdx) cls+=" cur"; html+='<div class="'+cls+'"></div>'; }
+    for(var i=0;i<wk().length;i++){ var cls="seg"; if(i<climbIdx) cls+=" done"; else if(i===climbIdx) cls+=" cur"; html+='<div class="'+cls+'"></div>'; }
     $("progress").innerHTML=html;
   }
   function renderSplits(){
@@ -521,7 +541,7 @@
   }
   function stopClimb(secs){
     running=false; clearInterval(tickHandle);
-    var c=CLIMBS[climbIdx];
+    var c=wk()[climbIdx];
     var rounded = secs==null?null:Math.round(secs*10)/10;
     cur.sets[setIdx].climbs.push({ key:c.key, name:c.name, type:c.type, seconds: rounded });
     // Live PR callout the moment a sprint beats your all-time best (per style)
@@ -535,7 +555,7 @@
   }
   function advance(){
     renderSplits();
-    if(climbIdx < CLIMBS.length-1){ climbIdx++; renderClimb(); renderProgress(); }
+    if(climbIdx < wk().length-1){ climbIdx++; renderClimb(); renderProgress(); }
     else { finishSet(); }
   }
   function finishSet(){
