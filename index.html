@@ -156,6 +156,15 @@
     </div>
 
     <div class="card">
+      <h2 style="margin-top:0">Power &amp; energy</h2>
+      <div class="row">
+        <div><label for="wGus">Gus — weight (lbs)</label><input type="number" id="wGus" inputmode="decimal" min="50" max="500" /></div>
+        <div><label for="wMatt">Matt — weight (lbs)</label><input type="number" id="wMatt" inputmode="decimal" min="50" max="500" /></div>
+      </div>
+      <p class="legend" style="margin-top:10px">Stairs: 36 steps × 6″ rise ≈ 18 ft (5.5 m) of vertical per climb. Watts = work ÷ climb time; Cal is an estimated metabolic burn (~22% muscle efficiency). Weight changes apply to future climbs — past workouts keep the numbers they were earned at.</p>
+    </div>
+
+    <div class="card">
       <h2 style="margin-top:0">Data</h2>
       <div class="row">
         <button class="btn-sm" id="exportCsvBtn">⬆︎ Export CSV</button>
@@ -213,6 +222,7 @@
   <!-- ============ SET DONE (RPE + rest) ============ -->
   <section id="setdone" class="hidden">
     <h1 id="setDoneTitle">Set complete</h1>
+    <div class="legend" id="setEnergyLine" style="margin:-2px 0 10px"></div>
     <div class="card">
       <label>How hard was that set? (RPE 1 = easy, 10 = max)</label>
       <div class="rpe-grid" id="rpeRow1"></div>
@@ -242,6 +252,7 @@
         <div class="stat"><div class="v" id="fRpe">—</div><div class="l">Avg RPE</div></div>
       </div>
       <div class="legend" id="fFade" style="margin-top:10px"></div>
+      <div class="legend" id="fEnergy" style="margin-top:6px"></div>
       <label for="notesInput">Notes / conditions (heat, soreness, how you felt)</label>
       <textarea id="notesInput" placeholder="e.g. 95°, legs heavy by set 4, felt strong on sprints"></textarea>
       <div class="row" style="margin-top:12px">
@@ -310,7 +321,7 @@
   function pad2(n){ return (n<10?"0":"")+n; }
   function todayISO(){ var d=new Date(); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
   function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY))||[]; }catch(e){ return []; } }
-  function loadSettings(){ try{ var s=JSON.parse(localStorage.getItem(SETTINGS_KEY))||{}; if(!s.restTarget) s.restTarget=120; if(!s.targetSets) s.targetSets=5; return s; }catch(e){ return {restTarget:120, targetSets:5}; } }
+  function loadSettings(){ try{ var s=JSON.parse(localStorage.getItem(SETTINGS_KEY))||{}; if(!s.restTarget) s.restTarget=120; if(!s.targetSets) s.targetSets=5; if(!s.weights) s.weights={Gus:275, Matt:312}; return s; }catch(e){ return {restTarget:120, targetSets:5, weights:{Gus:275, Matt:312}}; } }
   function persistSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }catch(e){} }
   function persist(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(sessions)); }catch(e){ toast("Storage error — export a backup!"); } }
   function toast(msg){ var t=$("toast"); t.textContent=msg; t.classList.add("show"); setTimeout(function(){ t.classList.remove("show"); },1800); }
@@ -388,6 +399,32 @@
   function fmtFade(f){ return (f.pct>=0?"+":"")+f.pct.toFixed(1)+"%"; }
   window.__stairFade = sprintFade; // exposed for headless verification
 
+  /* ---------- Power & energy (pure) ----------
+     The stairs are fixed: 36 steps × 6" rise ≈ 5.49 m of vertical per climb.
+     Mechanical work per climb: W = weight × g × height — same for every climb
+     style (and for skip-steps: same total height). Watts = work ÷ climb time,
+     so only timed climbs get watts; untimed climbs still earn energy.
+     Cal = estimated metabolic burn at ~22% muscle efficiency.
+     Values are computed with the athlete's weight at log time and stored on
+     the climb, so history keeps the numbers it was earned at. */
+  var STAIR_STEPS=36, STAIR_RISE_IN=6;
+  var CLIMB_HEIGHT_M = STAIR_STEPS*STAIR_RISE_IN*0.0254; // ≈5.486 m
+  var G=9.80665, EFFICIENCY=0.22, J_PER_KCAL=4184, LB_TO_KG=0.45359237;
+  function climbEnergyJ(who){
+    var lbs = settings.weights && settings.weights[who];
+    return lbs>0 ? lbs*LB_TO_KG*G*CLIMB_HEIGHT_M : null;
+  }
+  function energyStats(sets){ // -> {kj, kcal, avgW|null} or null if no energy data
+    var kj=0,kcal=0,js=0,secs=0,any=false;
+    sets.forEach(function(set){ set.climbs.forEach(function(c){
+      if(c.kj!=null){ any=true; kj+=c.kj; kcal+=(c.kcal||0); if(c.watts!=null && c.seconds>0){ js+=c.kj*1000; secs+=c.seconds; } }
+    });});
+    if(!any) return null;
+    return { kj:kj, kcal:kcal, avgW: secs>0? Math.round(js/secs) : null };
+  }
+  function fmtEnergy(en){ return en.kj.toFixed(1)+" kJ · "+Math.round(en.kcal)+" Cal"+(en.avgW!=null? " · avg "+en.avgW+" W":""); }
+  window.__stairEnergy = energyStats; // exposed for headless verification
+
   /* ---------- Audio + vibration alert (offline, no files) ---------- */
   var audioCtx = null;
   function ensureAudio(){
@@ -459,10 +496,10 @@
     // history (newest first)
     var hist = sessions.slice().sort(function(a,b){ return a.date<b.date?1:-1; });
     var html="";
-    hist.forEach(function(s){ var st=sessionStats(s); var f=sprintFade(s);
+    hist.forEach(function(s){ var st=sessionStats(s); var f=sprintFade(s); var en=energyStats(s.sets);
       var planned = s.targetSets? '/'+s.targetSets : '';
       html += '<div class="hist"><div><div class="d">'+s.date+(s.who? ' · '+escapeHtml(s.who):'')+'</div><div class="m">'+st.setsCompleted+planned+' sets · '+st.climbs+' climbs'+(s.notes? ' · '+escapeHtml(s.notes.slice(0,40)) : '')+'</div></div>'
-            + '<div class="r">'+fmtClock(st.total)+' active'+(st.sprint!=null? '<br>sprint '+fmtSec(st.sprint)+'s':'')+(f!=null? '<br>fade '+fmtFade(f):'')+(st.avgRpe!=null? '<br>RPE '+st.avgRpe.toFixed(1):'')+'</div></div>';
+            + '<div class="r">'+fmtClock(st.total)+' active'+(st.sprint!=null? '<br>sprint '+fmtSec(st.sprint)+'s':'')+(f!=null? '<br>fade '+fmtFade(f):'')+(en? '<br>'+Math.round(en.kcal)+' Cal'+(en.avgW!=null? ' · '+en.avgW+' W':''):'')+(st.avgRpe!=null? '<br>RPE '+st.avgRpe.toFixed(1):'')+'</div></div>';
     });
     $("histList").innerHTML = html;
   }
@@ -530,8 +567,9 @@
   }
   function renderSplits(){
     var set=cur.sets[setIdx]; var html="";
-    set.climbs.forEach(function(c){ html+='<div class="split"><span class="nm">'+c.name+'</span><span class="tm">'+(c.seconds!=null?fmtSec(c.seconds)+'s':'—')+'</span></div>'; });
+    set.climbs.forEach(function(c){ html+='<div class="split"><span class="nm">'+c.name+'</span><span class="tm">'+(c.seconds!=null?fmtSec(c.seconds)+'s':'—')+(c.watts!=null? ' · '+c.watts+' W':'')+'</span></div>'; });
     if(set.climbs.length===0) html='<div class="split"><span class="nm">No climbs logged yet</span><span class="tm"></span></div>';
+    else { var en=energyStats([set]); if(en) html+='<div class="split"><span class="nm"><b>Set total</b></span><span class="tm">'+fmtEnergy(en)+'</span></div>'; }
     $("splitList").innerHTML=html;
   }
   function startStop(){
@@ -543,7 +581,14 @@
     running=false; clearInterval(tickHandle);
     var c=wk()[climbIdx];
     var rounded = secs==null?null:Math.round(secs*10)/10;
-    cur.sets[setIdx].climbs.push({ key:c.key, name:c.name, type:c.type, seconds: rounded });
+    var rec = { key:c.key, name:c.name, type:c.type, seconds: rounded };
+    var E = climbEnergyJ(cur.who);
+    if(E!=null){
+      rec.kj   = Math.round(E/100)/10;                        // mechanical work, kJ
+      rec.kcal = Math.round(E/EFFICIENCY/J_PER_KCAL*10)/10;   // metabolic estimate
+      if(rounded!=null && rounded>0) rec.watts = Math.round(E/rounded);
+    }
+    cur.sets[setIdx].climbs.push(rec);
     // Live PR callout the moment a sprint beats your all-time best (per style)
     var kind = sprintKind(c);
     if((kind==="each"||kind==="skip") && rounded!=null){
@@ -561,6 +606,8 @@
   function finishSet(){
     clearInterval(tickHandle);
     $("setDoneTitle").textContent = "Set "+(setIdx+1)+" complete";
+    var setEn = energyStats([cur.sets[setIdx]]);
+    $("setEnergyLine").textContent = setEn? "This set: "+fmtEnergy(setEn) : "";
     // RPE buttons
     buildRpe();
     $("nextSetBtn").disabled=true; $("nextSetBtn").textContent="Pick an effort to continue";
@@ -621,6 +668,8 @@
     $("fRpe").textContent=st.avgRpe==null?"—":st.avgRpe.toFixed(1);
     var f=sprintFade(cur);
     $("fFade").textContent = f==null? "" : "Sprint fade: "+fmtFade(f)+" — first each-step sprint "+fmtSec(f.first)+"s → last "+fmtSec(f.last)+"s"+(f.pct<=3? " (held your speed 💪)":"");
+    var en=energyStats(cur.sets);
+    $("fEnergy").textContent = en? "Workout energy: "+en.kj.toFixed(1)+" kJ mechanical · ~"+Math.round(en.kcal)+" Cal burned"+(en.avgW!=null? " · avg power "+en.avgW+" W":"") : "";
     $("notesInput").value="";
     show("finish");
   }
@@ -651,11 +700,16 @@
 
   /* ---------- Export ---------- */
   function buildCSV(){
-    var rows=[["session_id","date","who","set_number","climb_index","climb_key","climb_name","climb_type","seconds","set_rpe","sets_completed_in_session","sets_planned_in_session","session_notes"]];
-    sessions.forEach(function(s){ var st=sessionStats(s);
+    var rows=[["session_id","date","who","set_number","climb_index","climb_key","climb_name","climb_type","seconds","watts","kj_mechanical","kcal_estimated","set_kj","set_kcal","set_avg_watts","workout_kj","workout_kcal","workout_avg_watts","set_rpe","sets_completed_in_session","sets_planned_in_session","session_notes"]];
+    sessions.forEach(function(s){ var st=sessionStats(s); var wEn=energyStats(s.sets);
       s.sets.forEach(function(set){
+        var sEn=energyStats([set]);
         set.climbs.forEach(function(c,ci){
-          rows.push([s.id,s.date,(s.who||""),set.setNumber,ci+1,c.key,c.name,c.type,(c.seconds==null?"":c.seconds),(set.rpe==null?"":set.rpe),st.setsCompleted,(s.targetSets||""),csvSafe(s.notes||"")]);
+          rows.push([s.id,s.date,(s.who||""),set.setNumber,ci+1,c.key,c.name,c.type,(c.seconds==null?"":c.seconds),
+            (c.watts==null?"":c.watts),(c.kj==null?"":c.kj),(c.kcal==null?"":c.kcal),
+            (sEn? sEn.kj.toFixed(1):""),(sEn? sEn.kcal.toFixed(1):""),(sEn&&sEn.avgW!=null? sEn.avgW:""),
+            (wEn? wEn.kj.toFixed(1):""),(wEn? wEn.kcal.toFixed(1):""),(wEn&&wEn.avgW!=null? wEn.avgW:""),
+            (set.rpe==null?"":set.rpe),st.setsCompleted,(s.targetSets||""),csvSafe(s.notes||"")]);
         });
       });
     });
@@ -717,6 +771,15 @@
   $("exportJsonBtn").onclick=exportJson;
   $("importBtn").onclick=function(){ $("importFile").click(); };
   $("importFile").onchange=function(e){ if(e.target.files[0]) importJson(e.target.files[0]); e.target.value=""; };
+  function wireWeight(id, who){
+    var inp=$(id); inp.value=settings.weights[who]||"";
+    inp.onchange=function(){
+      var v=parseFloat(inp.value);
+      if(v>=50 && v<=500){ settings.weights[who]=v; persistSettings(); toast(who+"'s weight saved ✓"); }
+      else { inp.value=settings.weights[who]||""; toast("Enter a weight in lbs"); }
+    };
+  }
+  wireWeight("wGus","Gus"); wireWeight("wMatt","Matt");
 
   // Keep screen logic sane if user backgrounds mid-climb: stop ticking display only.
   document.addEventListener("visibilitychange",function(){ if(document.hidden && running){ /* timer keeps real elapsed via startMs */ } });
