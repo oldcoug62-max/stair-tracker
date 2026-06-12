@@ -167,6 +167,10 @@
     <div class="card">
       <h2 style="margin-top:0">Data</h2>
       <div class="row">
+        <button class="btn-sm" id="emailLatestBtn">✉︎ Email latest workout</button>
+        <button class="btn-sm btn-ghost" id="emailAllBtn">✉︎ Email full history</button>
+      </div>
+      <div class="row" style="margin-top:10px">
         <button class="btn-sm" id="exportCsvBtn">⬆︎ Export CSV</button>
         <button class="btn-sm" id="exportJsonBtn">⬆︎ Backup JSON</button>
       </div>
@@ -174,7 +178,7 @@
         <button class="btn-sm btn-ghost" id="importBtn">⬇︎ Import backup</button>
         <input type="file" id="importFile" accept=".json" class="hidden" />
       </div>
-      <p class="legend" style="margin-top:10px">Export after each session and drop the file into your project folder (or email it to yourself). CSV is built for dashboards; JSON is a full restore-able backup.</p>
+      <p class="legend" style="margin-top:10px">✉︎ Email latest workout after each session — it opens a pre-filled email with the workout data in the body (just hit Send). The dashboard reads these automatically. Use ✉︎ Email full history once to backfill. CSV/JSON exports are file downloads for backups.</p>
     </div>
 
     <div class="card">
@@ -699,9 +703,9 @@
   }
 
   /* ---------- Export ---------- */
-  function buildCSV(){
+  function buildCSV(list){
     var rows=[["session_id","date","who","set_number","climb_index","climb_key","climb_name","climb_type","seconds","watts","kj_mechanical","kcal_estimated","set_kj","set_kcal","set_avg_watts","workout_kj","workout_kcal","workout_avg_watts","set_rpe","sets_completed_in_session","sets_planned_in_session","session_notes"]];
-    sessions.forEach(function(s){ var st=sessionStats(s); var wEn=energyStats(s.sets);
+    (list||sessions).forEach(function(s){ var st=sessionStats(s); var wEn=energyStats(s.sets);
       s.sets.forEach(function(set){
         var sEn=energyStats([set]);
         set.climbs.forEach(function(c,ci){
@@ -743,6 +747,25 @@
     return exportWho()+" "+pad2(d.getDate())+"."+pad2(d.getMonth()+1)+"."+d.getFullYear()+" "+pad2(d.getHours())+pad2(d.getMinutes())+ext;
   }
   function exportCsv(){ if(sessions.length===0){ toast("No workouts to export yet"); return; } download(exportName(".csv"), buildCSV(), "text/csv"); }
+
+  /* ---------- Email to dashboard ----------
+     Sends workout data IN THE EMAIL BODY (not as an attachment) so the
+     Claude dashboard can read it via the Gmail connector. Body starts with
+     a marker line the dashboard searches for. */
+  var DASH_EMAIL="oldcoug62@gmail.com";
+  function emailExport(list,label){
+    if(!list||list.length===0){ toast("No workouts to send yet"); return; }
+    var d=new Date();
+    var stamp=pad2(d.getDate())+"."+pad2(d.getMonth()+1)+"."+d.getFullYear()+" "+pad2(d.getHours())+pad2(d.getMinutes());
+    var who=(list[list.length-1].who)||exportWho();
+    var subject="Stair Tracker: "+who+" "+stamp+(label?" — "+label:"");
+    var body="STAIR_TRACKER_EXPORT v1 | "+who+" | "+stamp+"\n"+buildCSV(list);
+    var href="mailto:"+DASH_EMAIL+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
+    if(href.length>100000){ toast("History too large to email in one go — email recent workouts instead"); return; }
+    window.location.href=href;
+  }
+  function emailLatest(){ emailExport(sessions.slice(-1),""); }
+  function emailHistory(){ emailExport(sessions.slice(),"full history"); }
   function exportJson(){ if(sessions.length===0){ toast("Nothing to back up yet"); return; } download(exportName(".json"), JSON.stringify(sessions,null,2), "application/json"); }
   function importJson(file){
     var reader=new FileReader();
@@ -769,6 +792,8 @@
   $("discardBtn").onclick=function(){ if(confirm("Discard this workout without saving?")){ cur=null; renderHome(); show("home"); } };
   $("exportCsvBtn").onclick=exportCsv;
   $("exportJsonBtn").onclick=exportJson;
+  $("emailLatestBtn").onclick=emailLatest;
+  $("emailAllBtn").onclick=emailHistory;
   $("importBtn").onclick=function(){ $("importFile").click(); };
   $("importFile").onchange=function(e){ if(e.target.files[0]) importJson(e.target.files[0]); e.target.value=""; };
   function wireWeight(id, who){
