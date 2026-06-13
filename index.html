@@ -752,7 +752,8 @@
      Sends workout data IN THE EMAIL BODY (not as an attachment) so the
      Claude dashboard can read it via the Gmail connector. Body starts with
      a marker line the dashboard searches for. */
-  var DASH_EMAIL="oldcoug62@gmail.com";
+  var DASH_EMAIL="made.johnson2000@gmail.com";
+  var DASH_CC="oldcoug62@gmail.com"; // dashboard reads this mailbox — keep it copied
   function emailExport(list,label){
     if(!list||list.length===0){ toast("No workouts to send yet"); return; }
     var d=new Date();
@@ -760,7 +761,7 @@
     var who=(list[list.length-1].who)||exportWho();
     var subject="Stair Tracker: "+who+" "+stamp+(label?" — "+label:"");
     var body="STAIR_TRACKER_EXPORT v1 | "+who+" | "+stamp+"\n"+buildCSV(list);
-    var href="mailto:"+DASH_EMAIL+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
+    var href="mailto:"+DASH_EMAIL+"?cc="+encodeURIComponent(DASH_CC)+"&subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
     if(href.length>100000){ toast("History too large to email in one go — email recent workouts instead"); return; }
     window.location.href=href;
   }
